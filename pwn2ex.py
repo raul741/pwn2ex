@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-import argparse, json, requests, getpass, shutil
-from sys import audit
-from openpyxl import Workbook, load_workbook
+import argparse, json, requests, getpass, re
+from openpyxl import load_workbook
+from cvss import CVSS3
 
 # Disable selfsigned certs triggering alerts
 import urllib3
@@ -16,7 +16,7 @@ class PwnResponse():
         self.datas = datas
 
 class Vulnerability():
-    def __init__(self, id: int, description: str, criticality: str, cvss: float, assets: list[str], detection_date: str, root_cause: str, corrective_action: str, close_date: str, evidence: str, active: str, observation: str):
+    def __init__(self, id: int, description: str, criticality: str, cvss: str, assets: list[str], detection_date: str, root_cause: str, corrective_action: str, close_date: str, evidence: str, active: str, observation: str):
         self.id = id
         self.description = description
         self.criticality = criticality
@@ -30,7 +30,6 @@ class Vulnerability():
         self.active = active
         self.observation = observation
 
-
 class Audit():
     def __init__(self, id: str, title: str, auditType: str, findings: list[Vulnerability], company: str):
         self.id = id
@@ -41,67 +40,28 @@ class Audit():
 
 
 def main():
-    # vulns = []
-    # vuln1 = Vulnerability(
-    #     id=1,
-    #     description="Cisco ASA Outdated Firmware: Remote Code Execution & Arbitrary File Read",
-    #     criticality="Critical",
-    #     cvss=9.0,
-    #     assets=["50.220.195.3"],
-    #     detection_date="21/01/2026",
-    #     root_cause="Obsolete firmware version (Cisco ASA 5500) allows authentication bypass",
-    #     corrective_action="Migrate to the latest Cisco Security Advisory version or Cisco Secure Firewall 3100 apply patches,restrict external access immediately",
-    #     close_date="TBD",
-    #     evidence="Version identified (85% confidence) and PwnResponseentication Bypass POC successful",
-    #     active="Yes",
-    #     observation="High probability of compromise; persistence mechanisms may survive patching"
-    # )
-    # vuln2 = Vulnerability(
-    #     id=2,
-    #     description="Internet Key Exchange",
-    #     criticality="Medium",
-    #     cvss=5.3,
-    #     assets=["50.247.246.193", "66.152.110.218", "50.75.0.34", "50.212.67.17"],
-    #     detection_date="21/01/2026",
-    #     root_cause="VPN service uses IKEv1 Aggressive Mode transmitting hash before encryption",
-    #     corrective_action="Disable Aggressive Mode (force Main Mode) or replace PSK with Digital Certificates",
-    #     close_date="TBD",
-    #     evidence="Captured Aggressive Mode Handshake (PSK hash)",
-    #     active="Yes",
-    #     observation="Dictionary attack failed on captured hashes, but protocol remains insecure"
-    # )
-    # vulns.append(vuln1)
-    # vulns.append(vuln2)
-    #
-    # audit = Audit(
-    #     id="69bd30dba1444040f305e23b",
-    #     title="cool audit",
-    #     auditType="Hacking ético",
-    #     findings=vulns,
-    #     company="Tolovendo SL"
-    # )
     p = argparse.ArgumentParser(description="Convert JSON from Pwndoc API calls into a readable Excel file")
-    p.add_argument("-i","--input", required=True, nargs=1, help="Input Excel template")
-    p.add_argument("-o","--output", required=True, nargs=1, help="Output processed Excel file")
+    p.add_argument("-i","--input", required=True, help="Input Excel template")
+    p.add_argument("-o","--output", required=True, help="Output processed Excel file")
     p.add_argument("target", help="Target Pwndoc server")
     args = p.parse_args()
 
     username = input("Username: ")
     password = getpass.getpass(prompt="Password: ")
-    totp = getpass.getpass(prompt="TOTP Token (Leave empty if none): ")
+    totp = input("TOTP Token (Leave empty if none): ")
     target = args.target.rstrip('/')
 
     login = auth(target, username, password, totp).datas
     token = 'JWT%20' + login["token"]
     audit = get_audit(target=target, token=token)
-    #save_audit(audit=audit, template=args.input, output=args.output)
+    save_audit(audit=audit, template=args.input, output=args.output)
 
 
 def get_audit(target: str, token: str):
     url_audits = target + "/api/audits"
-    audits = req(url=url_audits, token=token).datas
+    audits_resp = req(url=url_audits, token=token).datas
     choosable_audits = []
-    for a in audits:
+    for a in audits_resp:
         choosable_audits.append({
             "id": a["_id"],
             "name": a["name"],
@@ -111,7 +71,55 @@ def get_audit(target: str, token: str):
     log("Choose the audit you wish to export:")
     chosen_audit = list_choice(choosable_audits)
     url_audit = target + "/api/audits/" + chosen_audit["id"]
-    print(url_audit)
+    audit_resp = req(url=url_audit, token=token).datas
+
+    vulns = []
+    for vuln in audit_resp["findings"]:
+        cvss = vuln.get("cvssv3")
+        score = "None"
+        criticality = "None"
+        if cvss is not None:
+            vector = CVSS3(cvss)
+            score = str(vector.scores()[0])
+            criticality = vector.severities()[0]
+        vulns.append(
+            Vulnerability(
+                id=vuln.get("identifier"),
+                description=vuln.get("title"),
+                criticality=criticality,
+                cvss=score,
+                root_cause="FILL ME",
+                assets=strip_html_to_list(vuln.get("scope"))[:-1],
+                detection_date="FILL ME",
+                observation=strip_html(vuln.get("observation")),
+                corrective_action=strip_html(vuln.get("remediation")),
+                close_date="TBD",
+                evidence=strip_html(vuln.get("poc")),
+                active="YES"
+            )
+        )
+    final_audit = Audit(
+        id=audit_resp["_id"],
+        title=audit_resp["name"],
+        auditType=audit_resp["auditType"],
+        findings=vulns,
+        company=audit_resp["company"]["name"]
+    )
+    return final_audit
+
+
+def strip_html_to_list(s):
+    if s is None:
+        s = ""
+    semistripped = re.sub(r"</.*?>", " ", s)
+    stripped = re.sub(r"<.*?>", "", semistripped).split(" ")
+    return stripped
+
+
+def strip_html(s):
+    if s is None:
+        s = ""
+    return re.sub(r"<.*?>", "", s)
 
 
 def save_audit(audit: Audit, template: str, output: str):
