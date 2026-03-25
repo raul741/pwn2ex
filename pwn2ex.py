@@ -88,13 +88,13 @@ def get_audit(target: str, token: str):
                 description=vuln.get("title"),
                 criticality=criticality,
                 cvss=score,
-                root_cause="FILL ME",
+                root_cause="N/A",
                 assets=strip_html_to_list(vuln.get("scope"))[:-1],
-                detection_date="FILL ME",
+                detection_date=audit_resp.get("date_end"),
                 observation=strip_html(vuln.get("observation")),
                 corrective_action=strip_html(vuln.get("remediation")),
                 close_date="TBD",
-                evidence=strip_html(vuln.get("poc")),
+                evidence=f"Graphic evidences: {audit_resp.get("name")}",
                 active="YES"
             )
         )
@@ -136,7 +136,7 @@ def save_audit(audit: Audit, template: str, output: str):
         sheet[f"C{ROW}"].value = vuln.description
         sheet[f"D{ROW}"].value = vuln.criticality
         sheet[f"E{ROW}"].value = vuln.cvss
-        sheet[f"F{ROW}"].value = ", ".join(vuln.assets)
+        sheet[f"F{ROW}"].value = "\n".join(vuln.assets)
         sheet[f"G{ROW}"].value = vuln.detection_date
         sheet[f"H{ROW}"].value = vuln.root_cause
         sheet[f"I{ROW}"].value = vuln.corrective_action
