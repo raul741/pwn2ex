@@ -42,12 +42,12 @@ class Audit():
 
 
 def main():
-    p = argparse.ArgumentParser(description="Convert JSON from Pwndoc API calls into a readable Excel file")
-    p.add_argument("-i","--input", required=True, help="Input Excel template")
-    p.add_argument("-o","--output", required=True, help="Output processed Excel file")
-    p.add_argument("-r","--row", required=False, help="Specify starting row (default: 4)", type=int, default=4)
-    p.add_argument("-c","--column", required=False, help="Specify starting column (default: B)", type=str, default="B")
-    p.add_argument("target", help="Target Pwndoc server")
+    p = argparse.ArgumentParser(description="automatically write vulnerabilities from a pwndoc audit to a template excel file")
+    p.add_argument("-i","--input", required=True, help="input excel template")
+    p.add_argument("-o","--output", required=True, help="output processed excel file")
+    p.add_argument("-r","--row", required=False, help="specify starting row (default: 4)", type=int, default=4)
+    p.add_argument("-c","--column", required=False, help="specify starting column (default: B)", type=str, default="B")
+    p.add_argument("target", help="target pwndoc server")
     args = p.parse_args()
 
     username = input("Username: ")
