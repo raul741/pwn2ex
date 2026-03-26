@@ -37,6 +37,8 @@ class Audit():
         self.auditType = auditType
         self.findings = findings
         self.company = company
+    def __str__(self):
+        return f"{self.title} ({self.company})"
 
 
 def main():
@@ -62,15 +64,18 @@ def get_audit(target: str, token: str):
     audits_resp = req(url=url_audits, token=token).datas
     choosable_audits = []
     for a in audits_resp:
-        choosable_audits.append({
-            "id": a["_id"],
-            "name": a["name"],
-            "auditType": a["auditType"],
-            "company": a["company"]["name"]
-        })
+        choosable_audits.append(
+            Audit(
+                id=a["_id"],
+                title=a["name"],
+                auditType=a["auditType"],
+                company=a["company"]["name"],
+                findings=[]
+            )
+        )
     log("Choose the audit you wish to export:")
     chosen_audit = list_choice(choosable_audits)
-    url_audit = target + "/api/audits/" + chosen_audit["id"]
+    url_audit = target + "/api/audits/" + chosen_audit.id
     audit_resp = req(url=url_audit, token=token).datas
 
     vulns = []
