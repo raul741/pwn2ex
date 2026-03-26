@@ -45,6 +45,8 @@ def main():
     p = argparse.ArgumentParser(description="Convert JSON from Pwndoc API calls into a readable Excel file")
     p.add_argument("-i","--input", required=True, help="Input Excel template")
     p.add_argument("-o","--output", required=True, help="Output processed Excel file")
+    p.add_argument("-r","--row", required=False, help="Specify starting row (default: 4)", type=int, default=4)
+    p.add_argument("-c","--column", required=False, help="Specify starting column (default: B)", type=str, default="B")
     p.add_argument("target", help="Target Pwndoc server")
     args = p.parse_args()
 
@@ -56,7 +58,7 @@ def main():
     login = auth(target, username, password, totp).datas
     token = 'JWT%20' + login["token"]
     audit = get_audit(target=target, token=token)
-    save_audit(audit=audit, template=args.input, output=args.output)
+    save_audit(audit=audit, template=args.input, output=args.output, row=args.row, col=args.column.upper())
 
 
 def get_audit(target: str, token: str):
@@ -127,31 +129,31 @@ def strip_html(s):
     return re.sub(r"<.*?>", "", s)
 
 
-def save_audit(audit: Audit, template: str, output: str):
-    """
-    NOTE:
-    FUNCTION HAS TO BE MODIFIED AS CELL POSITIONS ARE HARDCODED
-    """
-    ROW=4
+def save_audit(audit: Audit, template: str, output: str, row: int, col: str):
     wb = load_workbook(template)
     log("Select the sheet to fill:")
     sheet = wb[list_choice(wb.sheetnames)]
     for i, vuln in enumerate(audit.findings):
-        sheet[f"B{ROW}"].value = i+1
-        sheet[f"C{ROW}"].value = vuln.description
-        sheet[f"D{ROW}"].value = vuln.criticality
-        sheet[f"E{ROW}"].value = vuln.cvss
-        sheet[f"F{ROW}"].value = "\n".join(vuln.assets)
-        sheet[f"G{ROW}"].value = vuln.detection_date
-        sheet[f"H{ROW}"].value = vuln.root_cause
-        sheet[f"I{ROW}"].value = vuln.corrective_action
-        sheet[f"J{ROW}"].value = vuln.close_date
-        sheet[f"K{ROW}"].value = vuln.evidence
-        sheet[f"L{ROW}"].value = vuln.active
-        sheet[f"M{ROW}"].value = vuln.observation
-        ROW+=1
+        sheet[f"{col}{row}"].value = i+1
+        sheet[f"{next_col(col, 1)}{row}"].value = vuln.description
+        sheet[f"{next_col(col, 2)}{row}"].value = vuln.criticality
+        sheet[f"{next_col(col, 3)}{row}"].value = vuln.cvss
+        sheet[f"{next_col(col, 4)}{row}"].value = "\n".join(vuln.assets)
+        sheet[f"{next_col(col, 5)}{row}"].value = vuln.detection_date
+        sheet[f"{next_col(col, 6)}{row}"].value = vuln.root_cause
+        sheet[f"{next_col(col, 7)}{row}"].value = vuln.corrective_action
+        sheet[f"{next_col(col, 8)}{row}"].value = vuln.close_date
+        sheet[f"{next_col(col, 9)}{row}"].value = vuln.evidence
+        sheet[f"{next_col(col, 10)}{row}"].value = vuln.active
+        sheet[f"{next_col(col, 11)}{row}"].value = vuln.observation
+        row+=1
     wb.save(output)
     log(f"File \"{output}\" created successfully!")
+
+
+def next_col(letter: str, jump: int):
+    next = chr(ord(letter)+jump)
+    return next
 
 
 def list_choice(array: list):
