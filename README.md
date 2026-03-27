@@ -15,7 +15,7 @@ pip install -r requirements
 ## Usage
 
 ```text
-usage: pwn2ex.py [-h] -i INPUT -o OUTPUT [-r ROW] [-c COLUMN] target
+usage: pwn2ex.py [-h] -i INPUT -o OUTPUT [-r ROW] [-c COLUMN] [--keep-metadata] target
 
 automatically write vulnerabilities from a pwndoc audit to a template excel file
 
@@ -28,6 +28,7 @@ options:
   -o, --output OUTPUT  output processed excel file
   -r, --row ROW        specify starting row (default: 4)
   -c, --column COLUMN  specify starting column (default: B)
+  --keep-metadata      keep output excel file metadata (default: False)
 ```
 
 ## Examples
