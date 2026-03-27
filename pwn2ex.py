@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import argparse, json, requests, getpass, re
-from openpyxl import load_workbook
+import argparse, json, requests, getpass, re, datetime
+from openpyxl import load_workbook, Workbook
 from cvss import CVSS3
 
 # Disable selfsigned certs triggering alerts
@@ -47,6 +47,7 @@ def main():
     p.add_argument("-o","--output", required=True, help="output processed excel file")
     p.add_argument("-r","--row", required=False, help="specify starting row (default: 4)", type=int, default=4)
     p.add_argument("-c","--column", required=False, help="specify starting column (default: B)", type=str, default="B")
+    p.add_argument("--keep-metadata", required=False, help="keep output excel file metadata (default: False)", action="store_true", default=False)
     p.add_argument("target", help="target pwndoc server")
     args = p.parse_args()
 
@@ -58,7 +59,7 @@ def main():
     login = auth(target, username, password, totp).datas
     token = 'JWT%20' + login["token"]
     audit = get_audit(target=target, token=token)
-    save_audit(audit=audit, template=args.input, output=args.output, row=args.row, col=args.column.upper())
+    save_audit(audit=audit, template=args.input, output=args.output, row=args.row, col=args.column.upper(), wipe=not args.keep_metadata)
 
 
 def get_audit(target: str, token: str):
@@ -129,7 +130,7 @@ def strip_html(s):
     return re.sub(r"<.*?>", "", s)
 
 
-def save_audit(audit: Audit, template: str, output: str, row: int, col: str):
+def save_audit(audit: Audit, template: str, output: str, row: int, col: str, wipe: bool):
     wb = load_workbook(template)
     log("Select the sheet to fill:")
     sheet = wb[list_choice(wb.sheetnames)]
@@ -147,8 +148,29 @@ def save_audit(audit: Audit, template: str, output: str, row: int, col: str):
         sheet[f"{next_col(col, 10)}{row}"].value = vuln.active
         sheet[f"{next_col(col, 11)}{row}"].value = vuln.observation
         row+=1
+    if wipe:
+        wipe_metadata(wb)
     wb.save(output)
     log(f"File \"{output}\" created successfully!")
+
+
+def wipe_metadata(wb: Workbook):
+    p = wb.properties
+    p.creator=None
+    p.title=None
+    p.description=None
+    p.subject=None
+    p.identifier=None
+    p.language=None
+    p.created=datetime.datetime(1970, 1, 1, 0, 0, 0)
+    p.modified=datetime.datetime(1970, 1, 1, 0, 0, 0)
+    p.lastModifiedBy=None
+    p.category=None
+    p.contentStatus=None
+    p.version=None
+    p.revision=None
+    p.keywords=None
+    p.lastPrinted=None
 
 
 def next_col(letter: str, jump: int):
