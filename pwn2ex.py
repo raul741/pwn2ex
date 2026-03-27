@@ -16,7 +16,7 @@ class PwnResponse():
         self.datas = datas
 
 class Vulnerability():
-    def __init__(self, id: int, description: str, criticality: str, cvss: str, assets: list[str], detection_date: str, root_cause: str, corrective_action: str, close_date: str, evidence: str, active: str, observation: str):
+    def __init__(self, id: int, description: str, criticality: str, cvss: float, assets: list[str], detection_date: str, root_cause: str, corrective_action: str, close_date: str, evidence: str, active: str, observation: str):
         self.id = id
         self.description = description
         self.criticality = criticality
@@ -83,18 +83,18 @@ def get_audit(target: str, token: str):
     vulns = []
     for vuln in audit_resp["findings"]:
         cvss = vuln.get("cvssv3")
-        score = "None"
+        score = -1
         criticality = "None"
         if cvss is not None:
             vector = CVSS3(cvss)
-            score = str(vector.scores()[0])
+            score = vector.scores()[0]
             criticality = vector.severities()[0]
         vulns.append(
             Vulnerability(
                 id=vuln.get("identifier"),
                 description=vuln.get("title"),
                 criticality=criticality,
-                cvss=score,
+                cvss=score if score != -1 else 0,
                 root_cause="N/A",
                 assets=strip_html_to_list(vuln.get("scope"))[:-1],
                 detection_date=audit_resp.get("date_end"),
